@@ -107,7 +107,17 @@
     .slider-wrap { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 160px; }
     .range-edge { font-size: 10px; color: var(--text-m); white-space: nowrap; flex-shrink: 0; }
     .price-slider { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
-    .slider-cur { font-family: 'JetBrains Mono',monospace; font-size: 15px; font-weight: 700; color: var(--accent); flex-shrink: 0; min-width: 72px; text-align: right; }
+    .slider-cur {
+      font-family: 'JetBrains Mono',monospace; font-size: 14px; font-weight: 700; color: var(--accent);
+      flex-shrink: 0; width: 80px; text-align: right;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: var(--surface); padding: 3px 6px; outline: none;
+      -moz-appearance: textfield;
+    }
+    .slider-cur:focus { border-color: var(--accent); }
+    .slider-cur::-webkit-outer-spin-button,
+    .slider-cur::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .price-prefix { font-size: 12px; color: var(--text-m); flex-shrink: 0; }
 
     /* Row amount area (food / accommodation) */
     .row-amount-area { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: nowrap; }
@@ -568,12 +578,14 @@ function createRowEl(type, rowData) {
       <span class="range-edge">${fmt(range.max)}</span>
     </div>`;
 
+  const inputHTML = `<span class="price-prefix">¥</span><input type="number" class="slider-cur" value="${amount}" min="0" step="1">`;
+
   let rightHTML = '';
   if (type === 'food') {
     const sub = getRowAmount('food', rowData);
     rightHTML = `
       <div class="row-amount-area">
-        <span class="slider-cur">${fmt(amount)}</span>
+        ${inputHTML}
         <span class="unit-label">/人</span>
         <span class="row-sep">×</span>
         <div class="stepper">
@@ -589,7 +601,7 @@ function createRowEl(type, rowData) {
     const sub = getRowAmount('accommodation', rowData);
     rightHTML = `
       <div class="row-amount-area">
-        <span class="slider-cur">${fmt(amount)}</span>
+        ${inputHTML}
         <span class="unit-label">/泊</span>
         <span class="row-sep">×</span>
         <div class="stepper">
@@ -605,7 +617,7 @@ function createRowEl(type, rowData) {
     const sub = getRowAmount('sauna', rowData);
     rightHTML = `
       <div class="row-amount-area">
-        <span class="slider-cur">${fmt(amount)}</span>
+        ${inputHTML}
         <span class="unit-label">/人</span>
         <span class="row-sep">×</span>
         <div class="stepper">
@@ -618,8 +630,8 @@ function createRowEl(type, rowData) {
         <span class="row-subtotal">${fmt(sub)}</span>
       </div>`;
   } else {
-    // transport, extras — slider + current value only
-    rightHTML = `<span class="slider-cur">${fmt(amount)}</span>`;
+    // transport, extras
+    rightHTML = inputHTML;
   }
 
   const el = document.createElement('div');
@@ -717,7 +729,23 @@ function onSliderChange(rowEl, value, type) {
   if (!row) return;
   row.amount = value;
   const cur = rowEl.querySelector('.slider-cur');
-  if (cur) cur.textContent = fmt(value);
+  if (cur) cur.value = value;
+  updateRowSubtotal(rowEl, type, row);
+  saveState();
+  updateTotals();
+}
+
+function onPriceInput(rowEl, value, type) {
+  const row = (state[type] || []).find(r => r.id === rowEl.dataset.id);
+  if (!row) return;
+  const v = Math.max(0, value || 0);
+  row.amount = v;
+  // スライダーを可能な範囲内で追従
+  const slider = rowEl.querySelector('.price-slider');
+  if (slider) {
+    const clamped = Math.max(parseInt(slider.min) || 0, Math.min(parseInt(slider.max) || v, v));
+    slider.value = clamped;
+  }
   updateRowSubtotal(rowEl, type, row);
   saveState();
   updateTotals();
@@ -851,7 +879,7 @@ function applyMasterUpdate() {
         if (edges[0]) edges[0].textContent = fmt(range.min);
         if (edges[1]) edges[1].textContent = fmt(range.max);
         const cur = rowEl.querySelector('.slider-cur');
-        if (cur) cur.textContent = fmt(clamped);
+        if (cur) cur.value = clamped;
       }
       updateRowSubtotal(rowEl, type, row);
     });
@@ -919,6 +947,13 @@ document.addEventListener('input', e => {
   if (e.target.classList.contains('price-slider')) {
     const row = e.target.closest('.expense-row');
     if (row) onSliderChange(row, parseInt(e.target.value), row.dataset.type);
+    return;
+  }
+
+  // Direct price input
+  if (e.target.classList.contains('slider-cur')) {
+    const row = e.target.closest('.expense-row');
+    if (row) onPriceInput(row, parseInt(e.target.value) || 0, row.dataset.type);
     return;
   }
 
