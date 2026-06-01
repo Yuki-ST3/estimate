@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>旅費シミュレーター</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Noto+Sans+JP:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    /* ── 変数 ── */
+    :root {
+      --bg:       #F8F7F4;
+      --surface:  #FFFFFF;
+      --surface-r:#F2EFE9;
+      --text-p:   #1A1F36;
+      --text-s:   #4A4F6A;
+      --text-m:   #8A8FA8;
+      --text-inv: #FFFFFF;
+      --accent:   #C4A35A;
+      --accent-l: #EAD9AA;
+      --accent-d: #9A7A3A;
+      --border:   #E2DDD6;
+      --border-s: #EDE9E3;
+      --error:    #C0392B;
+      --sh-sm:    0 1px 3px rgba(26,31,54,.07);
+      --sh-md:    0 4px 16px rgba(26,31,54,.10);
+      --sh-lg:    0 8px 32px rgba(26,31,54,.14);
+      --r-sm:     4px;
+      --r-md:     8px;
+      --r-lg:     16px;
+      --hh:       58px;
+      --bh:       46px;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans JP','Inter',sans-serif; font-size: 15px; line-height: 1.6; color: var(--text-p); background: var(--bg); letter-spacing: .02em; }
+    button { cursor: pointer; font-family: inherit; }
+    input, textarea { font-family: inherit; }
+
+    /* ── Header ── */
+    header {
+      position: sticky; top: 0; z-index: 200; height: var(--hh);
+      background: var(--surface); border-bottom: 1px solid var(--border-s); box-shadow: var(--sh-sm);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 36px; gap: 16px;
+    }
+    .hd-left h1 { font-family: 'Cormorant Garamond',serif; font-size: 19px; font-weight: 600; font-feature-settings:"palt"; }
+    .hd-left h1 em { color: var(--accent); font-style: normal; }
+    .hd-left p  { font-size: 11px; color: var(--text-m); margin-top: 1px; }
+    .hd-right   { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+    /* Persons stepper */
+    .persons-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-s); }
+    .persons-count { font-family: 'JetBrains Mono',monospace; font-size: 18px; font-weight: 700; color: var(--text-p); min-width: 22px; text-align: center; }
+    .step-circle { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .15s; color: var(--text-s); }
+    .step-circle:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Header buttons */
+    .hd-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--r-md); font-size: 12px; font-weight: 500; border: none; transition: all .18s; white-space: nowrap; }
+    .hd-btn-danger { background: transparent; color: var(--error); border: 1px solid var(--error); }
+    .hd-btn-danger:hover { background: #fef2f2; }
+
+    /* ── Total Bar ── */
+    .total-bar {
+      position: sticky; top: var(--hh); z-index: 190; height: var(--bh);
+      background: var(--text-p); color: var(--text-inv);
+      display: flex; align-items: center; padding: 0 36px; overflow-x: auto; gap: 0;
+    }
+    .bar-item { display: flex; flex-direction: column; align-items: flex-start; padding-right: 16px; border-right: 1px solid rgba(255,255,255,.12); margin-right: 16px; flex-shrink: 0; }
+    .bar-item:last-child { border-right: none; margin-right: 0; }
+    .bar-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+    .bar-val { font-family: 'JetBrains Mono',monospace; font-size: 13px; font-weight: 700; }
+    .bar-grand { margin-left: auto; padding-left: 16px; border-left: 1px solid rgba(255,255,255,.2); }
+    .bar-grand .bar-label { opacity: .7; }
+    .bar-grand .bar-val { font-size: 17px; color: var(--accent); }
+
+    /* ── Main Layout ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 36px 60px; }
+    .main-grid { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+    @media (max-width: 1024px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .summary-wrap { order: -1; }
+      .container { padding: 20px 16px 48px; }
+      header, .total-bar { padding-left: 16px; padding-right: 16px; }
+    }
+
+    /* ── Card ── */
+    .card { background: var(--surface); border-radius: var(--r-md); border: 1px solid var(--border-s); box-shadow: var(--sh-sm); padding: 20px 22px; margin-bottom: 20px; }
+    .card-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+    .card-title { font-family: 'Cormorant Garamond',serif; font-size: 17px; font-weight: 600; }
+    .card-badge { font-family: 'JetBrains Mono',monospace; font-size: 11px; font-weight: 700; padding: 3px 10px; background: var(--accent-l); color: var(--accent-d); border-radius: 9999px; }
+
+    /* ── Add Chips ── */
+    .add-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .add-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 14px; border-radius: 9999px; border: 1.5px dashed var(--border); background: var(--surface); font-size: 12px; font-weight: 500; color: var(--text-s); transition: all .18s; }
+    .add-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-l); }
+    .add-chip .plus { font-size: 14px; line-height: 1; }
+
+    /* ── Empty State ── */
+    .empty-msg { font-size: 12px; color: var(--text-m); text-align: center; padding: 14px; }
+
+    /* ── Expense Row ── */
+    .expense-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; padding: 12px 14px; background: var(--surface-r); border-radius: var(--r-md); border: 1px solid var(--border-s); margin-bottom: 8px; }
+    .row-label { font-size: 13px; font-weight: 600; min-width: 90px; flex-shrink: 0; }
+
+    /* Slider */
+    .slider-wrap { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 160px; }
+    .range-edge { font-size: 10px; color: var(--text-m); white-space: nowrap; flex-shrink: 0; }
+    .price-slider { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+    .slider-cur { font-family: 'JetBrains Mono',monospace; font-size: 15px; font-weight: 700; color: var(--accent); flex-shrink: 0; min-width: 72px; text-align: right; }
+
+    /* Row amount area (food / accommodation) */
+    .row-amount-area { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: nowrap; }
+    .unit-label { font-size: 11px; color: var(--text-m); }
+    .row-sep    { font-size: 12px; color: var(--text-m); }
+    .row-subtotal { font-family: 'JetBrains Mono',monospace; font-size: 14px; font-weight: 700; color: var(--accent-d); min-width: 80px; text-align: right; }
+
+    /* Stepper (inside row) */
+    .stepper { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .stp-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); font-size: 14px; display: flex; align-items: center; justify-content: center; color: var(--text-s); transition: all .15s; }
+    .stp-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .stp-val  { font-family: 'JetBrains Mono',monospace; font-size: 14px; font-weight: 700; min-width: 18px; text-align: center; }
+    .stp-unit { font-size: 11px; color: var(--text-m); }
+
+    /* Delete button */
+    .btn-delete { width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; font-size: 14px; color: var(--text-m); display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; margin-left: 2px; }
+    .btn-delete:hover { background: #fef2f2; color: var(--error); }
+
+    /* ── Notes (備考欄) ── */
+    .notes-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-s); }
+    .notes-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-m); margin-bottom: 6px; }
+    .notes-textarea {
+      width: 100%; min-height: 58px; padding: 8px 10px;
+      border: 1px solid var(--border); border-radius: var(--r-md);
+      font-size: 12px; color: var(--text-s); background: var(--surface);
+      resize: vertical; outline: none; line-height: 1.55;
+      transition: border-color .15s;
+    }
+    .notes-textarea:focus { border-color: var(--accent); }
+    .notes-textarea::placeholder { color: var(--text-m); }
+
+    /* ── Master Settings (inline) ── */
+    details.master-card { margin-bottom: 20px; display: none; }
+    details.master-card > summary {
+      list-style: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 10px; border-bottom: 2px solid var(--accent); margin-bottom: 14px;
+    }
+    details.master-card > summary::-webkit-details-marker { display: none; }
+    details.master-card > summary .toggle-icon { font-size: 10px; color: var(--text-m); }
+    details.master-card[open] > summary .toggle-icon::before { content: '▲'; }
+    details.master-card:not([open]) > summary .toggle-icon::before { content: '▼'; }
+
+    .master-tabs { display: flex; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); margin-bottom: 12px; gap: 0; }
+    .master-tabs::-webkit-scrollbar { display: none; }
+    .master-tab { padding: 5px 14px; font-size: 12px; font-weight: 600; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-m); cursor: pointer; transition: all .18s; white-space: nowrap; flex-shrink: 0; }
+    .master-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .master-thead { display: grid; grid-template-columns: 1fr 70px 70px 70px 26px; gap: 6px; padding: 0 8px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-m); }
+    .master-row { display: grid; grid-template-columns: 1fr 70px 70px 70px 26px; gap: 6px; align-items: center; padding: 6px 8px; background: var(--surface-r); border-radius: var(--r-sm); border: 1px solid var(--border-s); margin-bottom: 5px; }
+    .master-input { height: 30px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); font-size: 12px; color: var(--text-p); outline: none; width: 100%; transition: border-color .15s; }
+    .master-input[type="number"] { font-family: 'JetBrains Mono',monospace; text-align: right; }
+    .master-input:focus { border-color: var(--accent); }
+    .master-del { width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; font-size: 12px; color: var(--text-m); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+    .master-del:hover { background: #fef2f2; color: var(--error); }
+    .master-add-btn { width: 100%; padding: 8px; margin-top: 8px; border: 1.5px dashed var(--border); border-radius: var(--r-md); background: transparent; font-size: 12px; font-weight: 500; color: var(--text-m); cursor: pointer; transition: all .18s; }
+    .master-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-l); }
+    @media (max-width: 640px) {
+      .master-thead, .master-row { grid-template-columns: 1fr 56px 56px 56px 26px; }
+    }
+
+    /* ── Summary Card ── */
+    .summary-wrap { position: sticky; top: calc(var(--hh) + var(--bh) + 28px); }
+    .summary-card { background: var(--surface); border-radius: var(--r-md); border: 1px solid var(--border-s); box-shadow: var(--sh-sm); padding: 22px; }
+    .sum-title { font-family: 'Cormorant Garamond',serif; font-size: 17px; font-weight: 600; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+    .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border-s); font-size: 13px; }
+    .sum-row:last-of-type { border-bottom: none; }
+    .sum-row .s-label { color: var(--text-s); }
+    .sum-row .s-val { font-family: 'JetBrains Mono',monospace; font-weight: 700; }
+    .sum-divider { height: 2px; background: var(--accent); margin: 14px 0; }
+    .sum-total-label { font-size: 11px; color: var(--text-s); margin-bottom: 3px; }
+    .sum-total-val { font-family: 'Cormorant Garamond',serif; font-size: 30px; color: var(--accent); line-height: 1.2; }
+    .pp-box { margin-top: 14px; padding: 12px; background: var(--accent-l); border-radius: var(--r-md); text-align: center; }
+    .pp-label { font-size: 11px; color: var(--text-s); margin-bottom: 3px; }
+    .pp-val { font-family: 'JetBrains Mono',monospace; font-size: 18px; font-weight: 700; color: var(--accent-d); }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 20px; right: 20px; background: var(--text-p); color: var(--text-inv); padding: 10px 18px; border-radius: var(--r-md); font-size: 13px; box-shadow: var(--sh-md); z-index: 2000; opacity: 0; transform: translateY(6px); transition: all .25s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Print ── */
+    @media print {
+      .hd-right, .total-bar, .add-chips, .btn-delete, .stp-btn, details.master-card { display: none !important; }
+      header { position: static; box-shadow: none; }
+      .main-grid { grid-template-columns: 1fr 240px; }
+      .summary-wrap { position: static; }
+      .container { padding: 0; }
+      body { background: white; }
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="hd-left">
+    <h1>旅費 <em>シミュレーター</em></h1>
+    <p>出発地：清州空港（청주공항）</p>
+  </div>
+  <div class="hd-right">
+    <div class="persons-wrap">
+      <span>参加</span>
+      <button class="step-circle" data-action="step-persons" data-delta="-1">−</button>
+      <span class="persons-count" id="persons-val">1</span>
+      <button class="step-circle" data-action="step-persons" data-delta="1">＋</button>
+      <span>名</span>
+    </div>
+    <button class="hd-btn hd-btn-danger" data-action="reset">リセット</button>
+  </div>
+</header>
+
+<!-- ── Total Bar ── -->
+<div class="total-bar">
+  <div class="bar-item"><span class="bar-label">交通費</span><span class="bar-val" id="bar-transport">¥0</span></div>
+  <div class="bar-item"><span class="bar-label">食費</span><span class="bar-val" id="bar-food">¥0</span></div>
+  <div class="bar-item"><span class="bar-label">宿泊費</span><span class="bar-val" id="bar-accommodation">¥0</span></div>
+  <div class="bar-item"><span class="bar-label">サウナ</span><span class="bar-val" id="bar-sauna">¥0</span></div>
+  <div class="bar-item"><span class="bar-label">その他</span><span class="bar-val" id="bar-extras">¥0</span></div>
+  <div class="bar-item bar-grand"><span class="bar-label">総合計</span><span class="bar-val" id="bar-total">¥0</span></div>
+</div>
+
+<!-- ── Main ── -->
+<main class="container">
+  <div class="main-grid">
+
+    <div class="sections">
+
+      <!-- 交通費 -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">交通費</span><span class="card-badge" id="badge-transport">¥0</span></div>
+        <div class="add-chips" id="transport-chips"></div>
+        <div id="transport-rows"><div class="empty-msg">上のボタンを押して移動区間を追加してください</div></div>
+        <!-- 参考料金表 -->
+        <div style="margin-bottom: 20px; padding: 14px; background: var(--surface-r); border-radius: var(--r-md); border: 1px solid var(--border-s);">
+          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-p); padding-bottom: 8px; border-bottom: 1px solid var(--border-s);">参考料金</h3>
+
+          <div style="margin-bottom: 14px;">
+            <h4 style="font-size: 12px; font-weight: 600; color: var(--text-s); margin-bottom: 8px;">空港送迎（メンバータクシー）</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; background: var(--surface);">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--accent);">
+                  <th style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-s);">区間</th>
+                  <th style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-s);">料金</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid var(--border-s);">
+                  <td style="padding: 8px 10px; text-align: left;">清州空港 → チンサン</td>
+                  <td style="padding: 8px 10px; text-align: right;">80,000～90,000ウォン</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-s);">
+                  <td style="padding: 8px 10px; text-align: left;">清州空港 → テドゥンサンホテル</td>
+                  <td style="padding: 8px 10px; text-align: right;">90,000～100,000ウォン</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 10px; text-align: left;">清州空港 → 月明洞</td>
+                  <td style="padding: 8px 10px; text-align: right;">90,000～100,000ウォン</td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="font-size: 11px; color: var(--text-m); margin-top: 6px;">※ 料金基準：10分 ≒ 約10,000ウォン</div>
+          </div>
+
+          <div>
+            <h4 style="font-size: 12px; font-weight: 600; color: var(--text-s); margin-bottom: 8px;">乗用車タクシー</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; background: var(--surface);">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--accent);">
+                  <th style="padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-s);">区間</th>
+                  <th style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--text-s);">料金</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid var(--border-s);">
+                  <td style="padding: 8px 10px; text-align: left;">チンサン → 月明洞</td>
+                  <td style="padding: 8px 10px; text-align: right;">20,000ウォン</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-s);">
+                  <td style="padding: 8px 10px; text-align: left;">テドゥンサンホテル → 月明洞</td>
+                  <td style="padding: 8px 10px; text-align: right;">30,000ウォン</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 10px; text-align: left;">チンサン → クムさん</td>
+                  <td style="padding: 8px 10px; text-align: right;">30,000ウォン</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="notes-section">
+          <div class="notes-label">備考</div>
+          <textarea class="notes-textarea" data-type="transport" placeholder="参考価格・メモを入力…" rows="2"></textarea>
+        </div>
+      </div>
+
+      <!-- 食費 -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">食費</span><span class="card-badge" id="badge-food">¥0</span></div>
+        <div class="add-chips" id="food-chips"></div>
+        <div id="food-rows"><div class="empty-msg">上のボタンを押してレストランを追加してください</div></div>
+        <div class="notes-section">
+          <div class="notes-label">備考</div>
+          <textarea class="notes-textarea" data-type="food" placeholder="参考価格・メモを入力…" rows="2"></textarea>
+        </div>
+      </div>
+
+      <!-- 宿泊費 -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">宿泊費</span><span class="card-badge" id="badge-accommodation">¥0</span></div>
+        <div class="add-chips" id="accommodation-chips"></div>
+        <div id="accommodation-rows"><div class="empty-msg">上のボタンを押して宿泊先を追加してください</div></div>
+        <div class="notes-section">
+          <div class="notes-label">備考</div>
+          <textarea class="notes-textarea" data-type="accommodation" placeholder="参考価格・メモを入力…" rows="2"></textarea>
+        </div>
+      </div>
+
+      <!-- テドゥンサンホテルサウナ -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">テドゥンサンホテルサウナ</span><span class="card-badge" id="badge-sauna">¥0</span></div>
+        <div class="add-chips" id="sauna-chips"></div>
+        <div id="sauna-rows"><div class="empty-msg">上のボタンを押して追加してください</div></div>
+      </div>
+
+      <!-- その他（スライダー） -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">その他</span><span class="card-badge" id="badge-extras">¥0</span></div>
+        <div class="add-chips" id="extras-chips"></div>
+        <div id="extras-rows"><div class="empty-msg">上のボタンを押して追加してください</div></div>
+      </div>
+
+      <!-- 価格マスタ設定 -->
+      <details class="card master-card" open>
+        <summary>
+          <span class="card-title">価格マスタ設定</span>
+          <span class="toggle-icon"></span>
+        </summary>
+        <div class="master-tabs">
+          <button class="master-tab active" data-action="master-tab" data-tab="vehicles">移動手段</button>
+          <button class="master-tab" data-action="master-tab" data-tab="restaurants">レストラン</button>
+          <button class="master-tab" data-action="master-tab" data-tab="hotels">宿泊先</button>
+          <button class="master-tab" data-action="master-tab" data-tab="sauna">サウナ</button>
+          <button class="master-tab" data-action="master-tab" data-tab="extras">その他</button>
+        </div>
+        <div id="master-content"></div>
+      </details>
+
+    </div><!-- /sections -->
+
+    <!-- Summary -->
+    <div class="summary-wrap">
+      <div class="summary-card">
+        <div class="sum-title">合計</div>
+        <div class="sum-row"><span class="s-label">交通費</span><span class="s-val" id="sum-transport">¥0</span></div>
+        <div class="sum-row"><span class="s-label">食費</span><span class="s-val" id="sum-food">¥0</span></div>
+        <div class="sum-row"><span class="s-label">宿泊費</span><span class="s-val" id="sum-accommodation">¥0</span></div>
+        <div class="sum-row"><span class="s-label">サウナ</span><span class="s-val" id="sum-sauna">¥0</span></div>
+        <div class="sum-row"><span class="s-label">その他</span><span class="s-val" id="sum-extras">¥0</span></div>
+        <div class="sum-divider"></div>
+        <div class="sum-total-label">総合計</div>
+        <div class="sum-total-val" id="sum-total">¥0</div>
+        <div class="pp-box">
+          <div class="pp-label">1人あたり（<span id="sum-persons">1</span>名）</div>
+          <div class="pp-val" id="sum-pp">¥0</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ────────────────────────────────────────────
+   State
+──────────────────────────────────────────── */
+const STORAGE_KEY = 'travel_sim_v5';
+
+const DEFAULT_STATE = {
+  persons: 1,
+  transport: [],
+  food: [],
+  accommodation: [],
+  sauna: [],
+  extras: [],
+  notes: {
+    transport: '',
+    food: '',
+    accommodation: ''
+  },
+  masters: {
+    vehicles: [
+      { id: 1, name: 'タクシー',     prices: { low: 5000,  mid: 15000, high: 50000 } },
+      { id: 2, name: 'マイクロバス', prices: { low: 5000,  mid: 25000, high: 50000 } },
+      { id: 3, name: '乗用車',       prices: { low: 5000,  mid: 12000, high: 50000 } }
+    ],
+    restaurants: [
+      { id: 1, name: 'インマンナ',         pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 2, name: 'アリラン食堂',       pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 3, name: '冷麺＆マンドゥ',     pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 4, name: 'チキン',             pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 5, name: 'スマイルベーカリー', pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 6, name: 'アヒル',             pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 7, name: 'ペッコッチェ',       pricePP: { low: 500, mid: 1000, high: 5000 } },
+      { id: 8, name: 'その他',             pricePP: { low: 500, mid: 1000, high: 5000 } }
+    ],
+    hotels: [
+      { id: 1, name: 'テドゥンサンホテル', pricePN: { low: 6000, mid: 12000, high: 20000 } },
+      { id: 2, name: 'ヌリセンター',       pricePN: { low: 5000, mid: 8000,  high: 15000 } },
+      { id: 3, name: '休養林',             pricePN: { low: 3000, mid: 5000,  high: 10000 } },
+      { id: 4, name: 'ホワイトキャッスル', pricePN: { low: 8000, mid: 12000, high: 20000 } },
+      { id: 5, name: '研修院',             pricePN: { low: 3000, mid: 5000,  high: 10000 } },
+      { id: 6, name: 'その他',             pricePN: { low: 3000, mid: 8000,  high: 20000 } }
+    ],
+    sauna: [
+      { id: 1, name: 'テドゥンサンホテルサウナ', prices: { low: 500, mid: 750, high: 1000 } }
+    ],
+    extras: [
+      { id: 1, name: 'その他', prices: { low: 0, mid: 50000, high: 100000 } }
+    ]
+  }
+};
+
+let state;
+let masterTab = 'vehicles';
+
+function loadState() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    state = s ? JSON.parse(s) : clone(DEFAULT_STATE);
+    if (!state.masters)         state.masters         = clone(DEFAULT_STATE.masters);
+    if (!state.masters.sauna)   state.masters.sauna   = clone(DEFAULT_STATE.masters.sauna);
+    if (!state.masters.extras)  state.masters.extras  = clone(DEFAULT_STATE.masters.extras);
+    if (!state.sauna)   state.sauna   = [];
+    if (!state.extras)  state.extras  = [];
+    if (!state.notes)   state.notes   = { transport: '', food: '', accommodation: '' };
+  } catch { state = clone(DEFAULT_STATE); }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+/* ────────────────────────────────────────────
+   Helpers
+──────────────────────────────────────────── */
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
+function fmt(n) { return '¥' + Math.round(n || 0).toLocaleString('ja-JP'); }
+function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ────────────────────────────────────────────
+   Master helpers
+──────────────────────────────────────────── */
+function getTabItems(tab) {
+  const key = { vehicles: 'vehicles', restaurants: 'restaurants', hotels: 'hotels', sauna: 'sauna', extras: 'extras' }[tab];
+  return state.masters[key] || [];
+}
+function getTabPriceField(tab) {
+  if (tab === 'restaurants') return 'pricePP';
+  if (tab === 'hotels')      return 'pricePN';
+  return 'prices';
+}
+function tabToType(tab) {
+  return { vehicles: 'transport', restaurants: 'food', hotels: 'accommodation', sauna: 'sauna', extras: 'extras' }[tab] || tab;
+}
+function typeToTab(type) {
+  return { transport: 'vehicles', food: 'restaurants', accommodation: 'hotels', sauna: 'sauna', extras: 'extras' }[type] || type;
+}
+
+function getMasterItem(type, masterId) {
+  const listMap = {
+    transport:     state.masters.vehicles,
+    food:          state.masters.restaurants,
+    accommodation: state.masters.hotels,
+    sauna:         state.masters.sauna,
+    extras:        state.masters.extras
+  };
+  return (listMap[type] || []).find(x => x.id === masterId);
+}
+function getRowMasterId(type, row) {
+  return row[{ transport: 'vehicleId', food: 'restaurantId', accommodation: 'hotelId', sauna: 'saunaId', extras: 'extraId' }[type]];
+}
+function getMasterRange(type, masterId) {
+  const m = getMasterItem(type, masterId);
+  if (!m) return { min: 0, mid: 0, max: 100000, step: 500 };
+  const stepMap = { transport: 500, food: 100, accommodation: 1000, sauna: 100, extras: 1000 };
+  const step = stepMap[type] || 500;
+  let p;
+  if (type === 'food')          p = m.pricePP;
+  else if (type === 'accommodation') p = m.pricePN;
+  else                          p = m.prices;
+  return { min: p?.low || 0, mid: p?.mid || 0, max: p?.high || 0, step };
+}
+function getMasterMid(type, masterId) { return getMasterRange(type, masterId).mid; }
+
+/* ────────────────────────────────────────────
+   Totals
+──────────────────────────────────────────── */
+function getUnitPrice(type, row)  { return row.amount || 0; }
+function getRowAmount(type, row) {
+  const unit = getUnitPrice(type, row);
+  if (type === 'food')          return unit * (row.persons || 1);
+  if (type === 'accommodation') return unit * (row.nights  || 1);
+  if (type === 'sauna')         return unit * (row.persons || 1);
+  return unit;
+}
+function calcTotals() {
+  const transport     = state.transport.reduce((s,r) => s + getRowAmount('transport', r), 0);
+  const food          = state.food.reduce((s,r) => s + getRowAmount('food', r), 0);
+  const accommodation = state.accommodation.reduce((s,r) => s + getRowAmount('accommodation', r), 0);
+  const sauna         = (state.sauna  || []).reduce((s,r) => s + getRowAmount('sauna',  r), 0);
+  const extras        = (state.extras || []).reduce((s,r) => s + getRowAmount('extras', r), 0);
+  return { transport, food, accommodation, sauna, extras, total: transport + food + accommodation + sauna + extras };
+}
+function updateTotals() {
+  const t = calcTotals();
+  const p = Math.max(1, state.persons || 1);
+  ['transport','food','accommodation','sauna','extras'].forEach(k => {
+    const bar   = document.getElementById(`bar-${k}`);
+    const sum   = document.getElementById(`sum-${k}`);
+    const badge = document.getElementById(`badge-${k}`);
+    if (bar)   bar.textContent   = fmt(t[k]);
+    if (sum)   sum.textContent   = fmt(t[k]);
+    if (badge) badge.textContent = fmt(t[k]);
+  });
+  document.getElementById('bar-total').textContent   = fmt(t.total);
+  document.getElementById('sum-total').textContent   = fmt(t.total);
+  document.getElementById('sum-pp').textContent      = fmt(t.total / p);
+  document.getElementById('sum-persons').textContent = p;
+}
+
+/* ────────────────────────────────────────────
+   Row creation
+──────────────────────────────────────────── */
+function createRowEl(type, rowData) {
+  const masterId = getRowMasterId(type, rowData);
+  const master   = getMasterItem(type, masterId);
+  const name     = master?.name ?? '（削除済み）';
+  const amount   = rowData.amount || 0;
+  const range    = getMasterRange(type, masterId);
+  const slVal    = Math.max(range.min, Math.min(range.max || amount, amount));
+
+  const sliderHTML = `
+    <div class="slider-wrap">
+      <span class="range-edge">${fmt(range.min)}</span>
+      <input type="range" class="price-slider" min="${range.min}" max="${range.max || amount}" step="${range.step}" value="${slVal}">
+      <span class="range-edge">${fmt(range.max)}</span>
+    </div>`;
+
+  let rightHTML = '';
+  if (type === 'food') {
+    const sub = getRowAmount('food', rowData);
+    rightHTML = `
+      <div class="row-amount-area">
+        <span class="slider-cur">${fmt(amount)}</span>
+        <span class="unit-label">/人</span>
+        <span class="row-sep">×</span>
+        <div class="stepper">
+          <button class="stp-btn" data-action="step" data-field="persons" data-delta="-1">−</button>
+          <span class="stp-val">${rowData.persons || 1}</span>
+          <span class="stp-unit">名</span>
+          <button class="stp-btn" data-action="step" data-field="persons" data-delta="1">＋</button>
+        </div>
+        <span class="row-sep">=</span>
+        <span class="row-subtotal">${fmt(sub)}</span>
+      </div>`;
+  } else if (type === 'accommodation') {
+    const sub = getRowAmount('accommodation', rowData);
+    rightHTML = `
+      <div class="row-amount-area">
+        <span class="slider-cur">${fmt(amount)}</span>
+        <span class="unit-label">/泊</span>
+        <span class="row-sep">×</span>
+        <div class="stepper">
+          <button class="stp-btn" data-action="step" data-field="nights" data-delta="-1">−</button>
+          <span class="stp-val">${rowData.nights || 1}</span>
+          <span class="stp-unit">泊</span>
+          <button class="stp-btn" data-action="step" data-field="nights" data-delta="1">＋</button>
+        </div>
+        <span class="row-sep">=</span>
+        <span class="row-subtotal">${fmt(sub)}</span>
+      </div>`;
+  } else if (type === 'sauna') {
+    const sub = getRowAmount('sauna', rowData);
+    rightHTML = `
+      <div class="row-amount-area">
+        <span class="slider-cur">${fmt(amount)}</span>
+        <span class="unit-label">/人</span>
+        <span class="row-sep">×</span>
+        <div class="stepper">
+          <button class="stp-btn" data-action="step" data-field="persons" data-delta="-1">−</button>
+          <span class="stp-val">${rowData.persons || 1}</span>
+          <span class="stp-unit">名</span>
+          <button class="stp-btn" data-action="step" data-field="persons" data-delta="1">＋</button>
+        </div>
+        <span class="row-sep">=</span>
+        <span class="row-subtotal">${fmt(sub)}</span>
+      </div>`;
+  } else {
+    // transport, extras — slider + current value only
+    rightHTML = `<span class="slider-cur">${fmt(amount)}</span>`;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'expense-row';
+  el.dataset.id   = rowData.id;
+  el.dataset.type = type;
+  el.innerHTML = `
+    <span class="row-label">${esc(name)}</span>
+    ${sliderHTML}
+    ${rightHTML}
+    <button class="btn-delete" data-action="delete" aria-label="削除">✕</button>`;
+  return el;
+}
+
+function renderExistingRows() {
+  ['transport','food','accommodation','sauna','extras'].forEach(type => {
+    const c = document.getElementById(`${type}-rows`);
+    if (!c) return;
+    c.innerHTML = '';
+    if (!state[type] || !state[type].length) {
+      c.innerHTML = '<div class="empty-msg">上のボタンを押して追加してください</div>';
+    } else {
+      state[type].forEach(row => c.appendChild(createRowEl(type, row)));
+    }
+  });
+}
+
+/* ────────────────────────────────────────────
+   Add chips
+──────────────────────────────────────────── */
+function renderAddChips() {
+  const cfg = {
+    transport:     { el: 'transport-chips',     items: state.masters.vehicles    },
+    food:          { el: 'food-chips',          items: state.masters.restaurants },
+    accommodation: { el: 'accommodation-chips', items: state.masters.hotels      },
+    sauna:         { el: 'sauna-chips',         items: state.masters.sauna       },
+    extras:        { el: 'extras-chips',        items: state.masters.extras      }
+  };
+  Object.entries(cfg).forEach(([type, { el, items }]) => {
+    const node = document.getElementById(el);
+    if (!node) return;
+    node.innerHTML = items.map(item =>
+      `<button class="add-chip" data-action="add-row" data-type="${type}" data-master-id="${item.id}">
+        <span class="plus">＋</span>${esc(item.name)}
+      </button>`
+    ).join('');
+  });
+}
+
+/* ────────────────────────────────────────────
+   Add / Remove rows
+──────────────────────────────────────────── */
+function addRow(type, masterId) {
+  const master = getMasterItem(type, masterId);
+  if (!master) return;
+  const id     = uid();
+  const amount = getMasterMid(type, masterId);
+  let rowData;
+  if (type === 'transport')     rowData = { id, vehicleId:    masterId, amount };
+  else if (type === 'food')     rowData = { id, restaurantId: masterId, amount, persons: state.persons || 1 };
+  else if (type === 'accommodation') rowData = { id, hotelId: masterId, amount, nights: 1 };
+  else if (type === 'sauna')    rowData = { id, saunaId:  masterId, amount, persons: state.persons || 1 };
+  else                          rowData = { id, extraId:  masterId, amount };
+
+  if (!state[type]) state[type] = [];
+  state[type].push(rowData);
+  saveState();
+  const c = document.getElementById(`${type}-rows`);
+  const emp = c.querySelector('.empty-msg');
+  if (emp) emp.remove();
+  c.appendChild(createRowEl(type, rowData));
+  updateTotals();
+}
+
+function removeRow(rowEl, type) {
+  const id = rowEl.dataset.id;
+  state[type] = state[type].filter(r => r.id !== id);
+  rowEl.remove();
+  const c = document.getElementById(`${type}-rows`);
+  if (!c.querySelector('.expense-row')) c.innerHTML = '<div class="empty-msg">上のボタンを押して追加してください</div>';
+  saveState();
+  updateTotals();
+}
+
+/* ────────────────────────────────────────────
+   Row updates (targeted DOM)
+──────────────────────────────────────────── */
+function updateRowSubtotal(rowEl, type, row) {
+  const el = rowEl.querySelector('.row-subtotal');
+  if (el) el.textContent = fmt(getRowAmount(type, row));
+}
+
+function onSliderChange(rowEl, value, type) {
+  const row = (state[type] || []).find(r => r.id === rowEl.dataset.id);
+  if (!row) return;
+  row.amount = value;
+  const cur = rowEl.querySelector('.slider-cur');
+  if (cur) cur.textContent = fmt(value);
+  updateRowSubtotal(rowEl, type, row);
+  saveState();
+  updateTotals();
+}
+
+function onStepperClick(rowEl, field, delta, type, btnEl) {
+  const row = (state[type] || []).find(r => r.id === rowEl.dataset.id);
+  if (!row) return;
+  row[field] = Math.max(1, (row[field] || 1) + delta);
+  // クリックされたボタンの親 .stepper 内の .stp-val を更新（行内に複数ある場合に対応）
+  const stepperEl = btnEl ? btnEl.closest('.stepper') : null;
+  const valEl = stepperEl ? stepperEl.querySelector('.stp-val') : rowEl.querySelector('.stp-val');
+  if (valEl) valEl.textContent = row[field];
+  updateRowSubtotal(rowEl, type, row);
+  saveState();
+  updateTotals();
+}
+
+function stepPersons(delta) {
+  state.persons = Math.max(1, (state.persons || 1) + delta);
+  document.getElementById('persons-val').textContent = state.persons;
+  saveState();
+  updateTotals();
+}
+
+/* ────────────────────────────────────────────
+   Master Settings (inline)
+──────────────────────────────────────────── */
+function renderMasterContent() {
+  const items  = getTabItems(masterTab);
+  const pField = getTabPriceField(masterTab);
+  const unitStrMap = {
+    vehicles:    '金額 (円)',
+    restaurants: '1人あたり (円)',
+    hotels:      '1泊あたり (円)',
+    sauna:       '金額 (円)',
+    extras:      '金額 (円)'
+  };
+  const unitStr = unitStrMap[masterTab] || '金額 (円)';
+
+  document.getElementById('master-content').innerHTML = `
+    <p style="font-size:11px;color:var(--text-m);margin-bottom:10px">${unitStr}の最低・基準・最高を設定してください</p>
+    <div class="master-thead">
+      <span>名前</span><span>最低</span><span>基準</span><span>最高</span><span></span>
+    </div>
+    ${items.map(item => `
+      <div class="master-row" data-id="${item.id}">
+        <input class="master-input" type="text"   value="${esc(item.name)}" data-field="name" placeholder="名前">
+        <input class="master-input" type="number" value="${item[pField]?.low  || 0}" data-field="low"  min="0" step="100">
+        <input class="master-input" type="number" value="${item[pField]?.mid  || 0}" data-field="mid"  min="0" step="100">
+        <input class="master-input" type="number" value="${item[pField]?.high || 0}" data-field="high" min="0" step="100">
+        <button class="master-del" data-action="delete-master" data-tab="${masterTab}" data-id="${item.id}">×</button>
+      </div>`).join('')}
+    ${!items.length ? '<div class="empty-msg">項目がありません</div>' : ''}
+    <button class="master-add-btn" data-action="add-master" data-tab="${masterTab}">＋ 追加</button>`;
+}
+
+function switchMasterTab(tab) {
+  masterTab = tab;
+  document.querySelectorAll('.master-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderMasterContent();
+}
+
+function addMasterItem(tab) {
+  const items = getTabItems(tab);
+  const newId = (items.length ? Math.max(...items.map(x => x.id)) : 0) + 1;
+  const pf    = getTabPriceField(tab);
+  items.push({ id: newId, name: '', [pf]: { low: 0, mid: 0, high: 0 } });
+  saveState();
+  if (tab === masterTab) renderMasterContent();
+  renderAddChips();
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#master-content .master-row');
+    if (rows.length) rows[rows.length-1].querySelector('[data-field="name"]')?.focus();
+  }, 50);
+}
+
+function deleteMasterItem(tab, id) {
+  const items = getTabItems(tab);
+  const idx   = items.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  if (!confirm(`「${items[idx].name || '（名前なし）'}」を削除しますか？`)) return;
+  items.splice(idx, 1);
+  saveState();
+  if (tab === masterTab) renderMasterContent();
+  renderAddChips();
+  showToast('削除しました');
+}
+
+function onMasterInput(masterRowEl, field, tab) {
+  const id    = parseInt(masterRowEl.dataset.id);
+  const items = getTabItems(tab);
+  const item  = items.find(x => x.id === id);
+  if (!item) return;
+
+  const inp = masterRowEl.querySelector(`[data-field="${field}"]`);
+  if (!inp) return;
+
+  if (field === 'name') {
+    item.name = inp.value;
+    renderAddChips();
+    const type = tabToType(tab);
+    (state[type] || []).forEach(row => {
+      if (getRowMasterId(type, row) === id) {
+        const rowEl = document.querySelector(`.expense-row[data-id="${row.id}"]`);
+        if (rowEl) { const lbl = rowEl.querySelector('.row-label'); if (lbl) lbl.textContent = inp.value || '（名前なし）'; }
+      }
+    });
+  } else {
+    const pf = getTabPriceField(tab);
+    item[pf][field] = parseInt(inp.value) || 0;
+    applyMasterUpdate();
+  }
+  saveState();
+}
+
+function applyMasterUpdate() {
+  ['transport','food','accommodation','sauna','extras'].forEach(type => {
+    (state[type] || []).forEach(row => {
+      const rowEl = document.querySelector(`.expense-row[data-id="${row.id}"]`);
+      if (!rowEl) return;
+      const range  = getMasterRange(type, getRowMasterId(type, row));
+      const slider = rowEl.querySelector('.price-slider');
+      if (slider) {
+        slider.min = range.min;
+        slider.max = range.max;
+        const clamped = Math.max(range.min, Math.min(range.max || row.amount, row.amount));
+        slider.value  = clamped;
+        row.amount    = clamped;
+        const edges = rowEl.querySelectorAll('.range-edge');
+        if (edges[0]) edges[0].textContent = fmt(range.min);
+        if (edges[1]) edges[1].textContent = fmt(range.max);
+        const cur = rowEl.querySelector('.slider-cur');
+        if (cur) cur.textContent = fmt(clamped);
+      }
+      updateRowSubtotal(rowEl, type, row);
+    });
+  });
+  saveState();
+  updateTotals();
+}
+
+/* ────────────────────────────────────────────
+   Reset
+──────────────────────────────────────────── */
+function resetAll() {
+  if (!confirm('入力データをすべてリセットしますか？\n（マスタ設定・備考は保持されます）')) return;
+  state.transport     = [];
+  state.food          = [];
+  state.accommodation = [];
+  state.sauna         = [];
+  state.extras        = [];
+  state.persons       = 1;
+  saveState();
+  document.getElementById('persons-val').textContent = 1;
+  renderExistingRows();
+  updateTotals();
+  showToast('リセットしました');
+}
+
+/* ────────────────────────────────────────────
+   Event delegation
+──────────────────────────────────────────── */
+document.addEventListener('click', e => {
+  // Add row chip
+  const addChip = e.target.closest('[data-action="add-row"]');
+  if (addChip) { addRow(addChip.dataset.type, parseInt(addChip.dataset.masterId)); return; }
+
+  // Delete expense row
+  const delRow = e.target.closest('[data-action="delete"]');
+  if (delRow) { const r = delRow.closest('.expense-row'); if (r) removeRow(r, r.dataset.type); return; }
+
+  // Row stepper (persons/nights)
+  const stepBtn = e.target.closest('[data-action="step"]');
+  if (stepBtn) { const r = stepBtn.closest('.expense-row'); if (r) onStepperClick(r, stepBtn.dataset.field, parseInt(stepBtn.dataset.delta), r.dataset.type, stepBtn); return; }
+
+  // Persons stepper (header)
+  const persStep = e.target.closest('[data-action="step-persons"]');
+  if (persStep) { stepPersons(parseInt(persStep.dataset.delta)); return; }
+
+  // Master tab switch
+  const masterTabBtn = e.target.closest('[data-action="master-tab"]');
+  if (masterTabBtn) { switchMasterTab(masterTabBtn.dataset.tab); return; }
+
+  // Add master item
+  const addMaster = e.target.closest('[data-action="add-master"]');
+  if (addMaster) { addMasterItem(addMaster.dataset.tab); return; }
+
+  // Delete master item
+  const delMaster = e.target.closest('[data-action="delete-master"]');
+  if (delMaster) { deleteMasterItem(delMaster.dataset.tab, parseInt(delMaster.dataset.id)); return; }
+
+  // Reset
+  if (e.target.closest('[data-action="reset"]')) { resetAll(); return; }
+});
+
+document.addEventListener('input', e => {
+  // Price slider in expense rows
+  if (e.target.classList.contains('price-slider')) {
+    const row = e.target.closest('.expense-row');
+    if (row) onSliderChange(row, parseInt(e.target.value), row.dataset.type);
+    return;
+  }
+
+  // Notes textarea
+  if (e.target.classList.contains('notes-textarea')) {
+    const type = e.target.dataset.type;
+    if (!state.notes) state.notes = {};
+    state.notes[type] = e.target.value;
+    saveState();
+    return;
+  }
+
+  // Master settings input
+  if (e.target.classList.contains('master-input')) {
+    const masterRow = e.target.closest('.master-row');
+    if (masterRow) onMasterInput(masterRow, e.target.dataset.field, masterTab);
+    return;
+  }
+});
+
+/* ────────────────────────────────────────────
+   Init
+──────────────────────────────────────────── */
+function init() {
+  document.getElementById('persons-val').textContent = state.persons || 1;
+  // 備考欄を復元
+  if (state.notes) {
+    ['transport','food','accommodation'].forEach(type => {
+      const el = document.querySelector(`.notes-textarea[data-type="${type}"]`);
+      if (el) el.value = state.notes[type] || '';
+    });
+  }
+  renderAddChips();
+  renderExistingRows();
+  renderMasterContent();
+  updateTotals();
+}
+
+loadState();
+init();
+</script>
+</body>
+</html>
